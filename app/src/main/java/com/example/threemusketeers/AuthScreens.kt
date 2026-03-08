@@ -35,7 +35,7 @@ fun CustomerRegisterScreen(navController: NavHostController, userDao: UserDao) {
     var passwordVisible by remember { mutableStateOf(false) }
     var showError by remember { mutableStateOf(false) }
 
-    val coroutineScope = rememberCoroutineScope() // ใช้สำหรับเรียก Database
+    val coroutineScope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier.fillMaxSize().background(Color.White).padding(24.dp),

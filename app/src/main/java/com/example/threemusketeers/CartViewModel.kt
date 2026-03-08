@@ -76,11 +76,15 @@ class CartViewModel(
         val itemToRemove = currentCart.find { it.productId == productId }
 
         if (itemToRemove != null) {
-            recentlyDeletedItems[productId] = itemToRemove
+            // ลบจาก RAM ทันที
             currentCart.remove(itemToRemove)
             _cartItems.value = currentCart
 
+            // ยกเลิกคำสั่งรอ Save ของสินค้านี้
             debounceJobs[productId]?.cancel()
+            debounceJobs.remove(productId)
+
+            // ลบออกจาก Database
             viewModelScope.launch(Dispatchers.IO) {
                 repository.removeCartItem(userId, productId)
             }
@@ -172,17 +176,19 @@ class CartViewModel(
         }
 
         viewModelScope.launch(Dispatchers.IO) {
+            // บันทึกลงประวัติการสั่งซื้อ
             repository.saveOrders(newOrders)
 
+            // เคลียร์ตะกร้าของร้านนี้ออกจาก RAM และ Database
             val itemsToKeep = currentCart.filter { it.merchantId != merchantId }
             _cartItems.value = itemsToKeep
             repository.clearCartByMerchant(userId, merchantId)
 
+            // ล้าง Job ค้างเซฟทั้งหมดของร้านนี้
             storeCartItems.forEach { item ->
                 debounceJobs[item.productId]?.cancel()
                 debounceJobs.remove(item.productId)
             }
-            recentlyDeletedItems.clear()
         }
     }
 }

@@ -3,6 +3,7 @@ package com.example.threemusketeers
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -17,7 +18,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
-import kotlinx.coroutines.launch
 
 @Composable
 fun StoreScreen(
@@ -26,7 +26,6 @@ fun StoreScreen(
     cartViewModel: CartViewModel
 ) {
     val restaurant = mockRestaurants.find { it.id == storeId } ?: mockRestaurants[0]
-
 
     val userId = SessionManager.currentUser?.userId ?: 1
     val merchantIdInt = restaurant.id.toIntOrNull() ?: 1
@@ -37,8 +36,15 @@ fun StoreScreen(
     val totalItems = storeCartItems.sumOf { it.qty }
     val totalPrice = storeCartItems.sumOf { it.price * it.qty }
 
-    val snackbarHostState = remember { SnackbarHostState() }
-    val coroutineScope = rememberCoroutineScope()
+    // ดึงหมวดหมู่ออกมาจากเมนูที่มีอยู่จริงในร้านนี้เท่านั้น
+    val availableCategories = restaurant.menus.map { it.category }.distinct()
+    val menuCategories = listOf("ทั้งหมด") + availableCategories
+
+    var selectedMenuCategory by remember { mutableStateOf("ทั้งหมด") }
+
+    val filteredMenus = restaurant.menus.filter {
+        selectedMenuCategory == "ทั้งหมด" || it.category == selectedMenuCategory
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
@@ -48,7 +54,29 @@ fun StoreScreen(
         ) {
             item { RestaurantHeader(restaurant) }
 
-            items(restaurant.menus) { menu ->
+            // แถบปุ่มกดเลือกหมวดหมู่
+            item {
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(menuCategories) { category ->
+                        FilterChip(
+                            selected = selectedMenuCategory == category,
+                            onClick = { selectedMenuCategory = category },
+                            label = { Text(category) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Color(0xFFFFC107),
+                                selectedLabelColor = Color.Black
+                            ),
+                            shape = RoundedCornerShape(20.dp)
+                        )
+                    }
+                }
+            }
+
+            // แสดงรายการอาหาร
+            items(filteredMenus) { menu ->
                 val cartItem = storeCartItems.find { it.productId == menu.id }
                 val currentQty = cartItem?.qty ?: 0
 
@@ -74,44 +102,39 @@ fun StoreScreen(
                     },
                     onDecreaseClick = {
                         val newQty = currentQty - 1
-                        cartViewModel.updateQuantity(userId, menu.id, newQty)
-
                         if (newQty <= 0) {
-                            coroutineScope.launch {
-                                val result = snackbarHostState.showSnackbar(
-                                    message = "ลบ ${menu.name} แล้ว",
-                                    actionLabel = "เลิกทำ"
-                                )
-                                if (result == SnackbarResult.ActionPerformed) {
-                                    cartViewModel.undoRemove(menu.id) // ส่ง ID ไปกู้ข้อมูล
-                                } else {
-                                    cartViewModel.clearUndoHistory(menu.id)
-                                }
-                            }
+                            cartViewModel.removeFromCart(userId, menu.id)
+                        } else {
+                            cartViewModel.updateQuantity(userId, menu.id, newQty)
                         }
                     }
                 )
                 HorizontalDivider(color = Color(0xFFF0F0F0))
             }
 
+            if (filteredMenus.isEmpty()) {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                        Text("ไม่มีเมนูในหมวดหมู่นี้", color = Color.Gray)
+                    }
+                }
+            }
+
             item { Spacer(modifier = Modifier.height(100.dp)) }
         }
 
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 90.dp)
-        )
-
+        // แถบสรุปยอดด้านล่าง
         if (totalItems > 0) {
             CartSummaryBar(
                 totalItems = totalItems,
                 totalPrice = totalPrice,
                 onCheckoutClick = {
-                    cartViewModel.syncCartToDatabase()
-                    navController.navigate(Screen.Payment.createRoute(restaurant.id)) // ส่งรหัสร้านไป Payment
+                    navController.navigate(Screen.Payment.createRoute(restaurant.id))
                 },
                 onClearClick = {
-                    cartViewModel.checkoutByMerchant(userId, merchantIdInt) // ล้างเฉพาะร้านนี้
+                    storeCartItems.forEach { item ->
+                        cartViewModel.removeFromCart(userId, item.productId)
+                    }
                 },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -136,7 +159,7 @@ fun RestaurantHeader(restaurant: Restaurant) {
         Text(text = "⭐ ${restaurant.rating} · ${restaurant.deliveryTime}", color = Color.Gray)
         Text(text = restaurant.address, fontSize = 14.sp, color = Color.LightGray)
         Spacer(modifier = Modifier.height(16.dp))
-        Text(text = "เมนูแนะนำ", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Text(text = "เมนูอาหาร", fontSize = 18.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -150,6 +173,14 @@ fun MenuCard(menu: FoodMenu, qty: Int, onAddClick: () -> Unit, onDecreaseClick: 
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(text = menu.name, fontWeight = FontWeight.Medium, fontSize = 16.sp)
+
+            Text(
+                text = menu.category,
+                fontSize = 12.sp,
+                color = Color.Gray,
+                modifier = Modifier.padding(vertical = 2.dp)
+            )
+
             Text(text = "฿${menu.price}", color = Color(0xFF006400), fontWeight = FontWeight.Bold)
         }
 

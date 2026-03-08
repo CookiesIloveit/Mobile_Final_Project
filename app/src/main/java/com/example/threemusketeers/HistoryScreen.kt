@@ -110,17 +110,16 @@ fun OrderHistoryCard(order: OrderHistory) {
 
 @Composable
 fun StatusBadge(status: String) {
-    // 🌟 ใช้ when เพื่อล็อคสีให้ตรงกับสถานะเป๊ะๆ
     val bgColor = when (status) {
-        "กำลังดำเนินการ" -> Color(0xFFE3F2FD) // สีฟ้าอ่อน
-        "จัดส่งสำเร็จ" -> Color(0xFFE8F5E9)   // สีเขียวอ่อน
-        else -> Color(0xFFEEEEEE)            // สีเทาอ่อน (เผื่อสถานะอื่นๆ ในอนาคต)
+        "กำลังดำเนินการ" -> Color(0xFFE3F2FD)
+        "จัดส่งสำเร็จ" -> Color(0xFFE8F5E9)
+        else -> Color(0xFFEEEEEE)
     }
 
     val textColor = when (status) {
-        "กำลังดำเนินการ" -> Color(0xFF1976D2) // สีฟ้าเข้ม
-        "จัดส่งสำเร็จ" -> Color(0xFF4CAF50)   // สีเขียวเข้ม
-        else -> Color(0xFF757575)            // สีเทาเข้ม
+        "กำลังดำเนินการ" -> Color(0xFF1976D2)
+        "จัดส่งสำเร็จ" -> Color(0xFF4CAF50)
+        else -> Color(0xFF757575)
     }
 
     Row(
