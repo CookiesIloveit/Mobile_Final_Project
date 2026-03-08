@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
@@ -22,7 +24,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 object SessionManager {
-    var currentUser: UserEntity? = null
+    var currentUser: UserEntity? = null      // สำหรับลูกค้า
+    var currentMerchant: MerchantEntity? = null // สำหรับร้านค้า (เพิ่มตัวนี้)
 }
 
 @Composable
@@ -112,11 +115,15 @@ fun CustomerRegisterScreen(navController: NavHostController, userDao: UserDao) {
 }
 
 @Composable
-fun LoginScreen(navController: NavHostController, userDao: UserDao) {
+fun LoginScreen(navController: NavHostController, userDao: UserDao, merchantDao: MerchantDao) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var showAuthError by remember { mutableStateOf(false) }
+
+    // 0 = ลูกค้า, 1 = ร้านค้า
+    var selectedTab by remember { mutableStateOf(0) }
+    val tabs = listOf("สำหรับลูกค้า", "สำหรับร้านค้า")
 
     val coroutineScope = rememberCoroutineScope()
 
@@ -125,12 +132,36 @@ fun LoginScreen(navController: NavHostController, userDao: UserDao) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text("เข้าสู่ระบบ", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color(0xFFD32F2F))
+        // หัวข้อแอป
+        Text("Three Musketeers", fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFD32F2F))
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // --- ส่วนเลือกประเภท (Tabs) ---
+        TabRow(
+            selectedTabIndex = selectedTab,
+            containerColor = Color.White,
+            contentColor = Color(0xFFD32F2F)
+        ) {
+            tabs.forEachIndexed { index, title ->
+                Tab(
+                    selected = selectedTab == index,
+                    onClick = {
+                        selectedTab = index
+                        showAuthError = false // ล้าง error เวลาสลับ tab
+                    },
+                    text = { Text(title, fontWeight = FontWeight.Bold) }
+                )
+            }
+        }
+
         Spacer(modifier = Modifier.height(32.dp))
 
+        // ช่องกรอกข้อมูล (ใช้ร่วมกัน)
         OutlinedTextField(
             value = username, onValueChange = { username = it },
-            label = { Text("Email / ชื่อบัญชี") }, modifier = Modifier.fillMaxWidth()
+            label = { Text(if (selectedTab == 0) "Email / ชื่อบัญชีลูกค้า" else "ชื่อบัญชีร้านค้า") },
+            modifier = Modifier.fillMaxWidth(),
+            leadingIcon = { Icon(Icons.Default.Person, null) }
         )
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -138,30 +169,45 @@ fun LoginScreen(navController: NavHostController, userDao: UserDao) {
             value = password, onValueChange = { password = it },
             label = { Text("Password") }, modifier = Modifier.fillMaxWidth(),
             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            leadingIcon = { Icon(Icons.Default.Lock, null) },
             trailingIcon = {
                 val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
                 IconButton(onClick = { passwordVisible = !passwordVisible }) { Icon(imageVector = image, contentDescription = null) }
             }
         )
-        Spacer(modifier = Modifier.height(16.dp))
 
         if (showAuthError) {
-            Text("ชื่อบัญชีหรือรหัสผ่านไม่ถูกต้อง!", color = Color.Red, fontSize = 14.sp)
-            Spacer(modifier = Modifier.height(16.dp))
+            Text("ชื่อบัญชีหรือรหัสผ่านไม่ถูกต้อง!", color = Color.Red, fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp))
         }
 
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // ปุ่ม Login ที่ทำงานแยกกันตาม Tab
         Button(
             onClick = {
                 if (username.isNotBlank() && password.isNotBlank()) {
                     coroutineScope.launch(Dispatchers.IO) {
-                        val user = userDao.login(username, password)
-
-                        withContext(Dispatchers.Main) {
-                            if (user != null) {
-                                SessionManager.currentUser = user
-                                navController.navigate(Screen.Home.route) { popUpTo("login") { inclusive = true } }
-                            } else {
-                                showAuthError = true
+                        if (selectedTab == 0) {
+                            // --- Login ลูกค้า (โค้ดเพื่อน) ---
+                            val user = userDao.login(username, password)
+                            withContext(Dispatchers.Main) {
+                                if (user != null) {
+                                    SessionManager.currentUser = user
+                                    SessionManager.currentMerchant = null // เคลียร์ของร้านค้าออก
+                                    navController.navigate(Screen.Home.route) { popUpTo("login") { inclusive = true } }
+                                } else { showAuthError = true }
+                            }
+                        } else {
+                            // --- Login ร้านค้า (โค้ดคุณ) ---
+                            val merchant = merchantDao.loginMerchant(username, password)
+                            withContext(Dispatchers.Main) {
+                                if (merchant != null) {
+                                    SessionManager.currentMerchant = merchant
+                                    SessionManager.currentUser = null // เคลียร์ของลูกค้าออก
+                                    navController.navigate("merchant_home/${merchant.merchantId}") {
+                                        popUpTo("login") { inclusive = true }
+                                    }
+                                } else { showAuthError = true }
                             }
                         }
                     }
@@ -173,13 +219,20 @@ fun LoginScreen(navController: NavHostController, userDao: UserDao) {
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
             shape = RoundedCornerShape(12.dp)
         ) {
-            Text("เข้าสู่ระบบ", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text(if (selectedTab == 0) "เข้าสู่ระบบลูกค้า" else "เข้าสู่ระบบร้านค้า", color = Color.White, fontSize = 16.sp)
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        TextButton(onClick = { navController.navigate("customer_register") }) {
-            Text("ยังไม่มีบัญชีลูกค้า? สมัครเลย", color = Color(0xFFD32F2F))
+        // ปุ่มสมัครสมาชิก แยกหน้าตาม Tab
+        TextButton(onClick = {
+            if (selectedTab == 0) navController.navigate("customer_register")
+            else navController.navigate("merchant_register") // ชื่อ Route ที่คุณตั้งไว้
+        }) {
+            Text(
+                if (selectedTab == 0) "ยังไม่มีบัญชีลูกค้า? สมัครเลย" else "ยังไม่ได้ลงทะเบียนร้านค้า? คลิกที่นี่",
+                color = Color(0xFFD32F2F)
+            )
         }
     }
 }

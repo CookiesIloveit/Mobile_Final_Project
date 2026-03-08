@@ -28,6 +28,14 @@ class CartViewModel(
         }
     }
 
+    fun clearCartByMerchant(userId: Int, merchantId: Int) {
+        viewModelScope.launch {
+            repository.clearCartByMerchant(userId, merchantId)
+            // หลังจากลบใน DB แล้ว ต้องโหลดข้อมูลใหม่เพื่อให้ UI อัปเดตทันที
+            loadCartFromDatabase(userId)
+        }
+    }
+
     fun addToCart(newItem: CartEntity) {
         val currentCart = _cartItems.value.toMutableList()
         val existingIndex = currentCart.indexOfFirst { it.productId == newItem.productId }

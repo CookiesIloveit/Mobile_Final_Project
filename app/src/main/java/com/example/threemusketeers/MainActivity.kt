@@ -43,25 +43,87 @@ class CartViewModelFactory(
 }
 
 @Composable
-fun AppNavHost(navController: NavHostController, userDao: UserDao, cartViewModel: CartViewModel, modifier: Modifier = Modifier) {
+fun AppNavHost(navController: NavHostController,
+               database: AppDatabase,        // รับแค่ database ตัวเดียวพอ
+               cartViewModel: CartViewModel,
+               modifier: Modifier = Modifier) {
     NavHost(
         navController = navController,
         startDestination = "login",
         modifier = modifier
     ) {
-        composable("login") { LoginScreen(navController = navController, userDao = userDao) }
-        composable("customer_register") { CustomerRegisterScreen(navController = navController, userDao = userDao) }
-        composable(Screen.Home.route) { HomeScreen(navController = navController) }
-        composable(Screen.History.route) { HistoryScreen(cartViewModel = cartViewModel) }
+        composable("login") {
+            // ส่งทั้ง userDao และ merchantDao เข้าไป
+            LoginScreen(
+                navController = navController,
+                userDao = database.userDao(),     // ดึงจาก database ตรงนี้เลย
+                merchantDao = database.merchantDao() // ดึงจาก database ตรงนี้เลย
+            )
+        }
+        composable("customer_register") { CustomerRegisterScreen(navController = navController, userDao = database.userDao()) }
+        composable("merchant_register") {
+            MerchantRegisterScreen(navController = navController)
+        }
+
+        composable(Screen.Home.route) {
+            HomeScreen(navController = navController, database = database)
+        }
+        composable("merchant_home/{merchantId}") { backStackEntry ->
+            val merchantId = backStackEntry.arguments?.getString("merchantId")?.toIntOrNull() ?: 0
+            MerchantHomeScreen(navController = navController, merchantId = merchantId)
+        }
+
+        composable(Screen.History.route) {
+            HistoryScreen(
+                cartViewModel = cartViewModel,
+                database = database // ส่ง database เข้าไปด้วย
+            )
+        }
         composable(Screen.Account.route) { AccountScreen(navController = navController) }
 
-        composable(Screen.Store.route) { backStackEntry ->
+        composable("store/{storeId}") { backStackEntry -> // ตรวจสอบว่าใน Screen.Store.route คือ "store/{storeId}"
             val storeId = backStackEntry.arguments?.getString("storeId")
-            StoreScreen(navController = navController, storeId = storeId, cartViewModel = cartViewModel)
+            StoreScreen(
+                navController = navController,
+                storeId = storeId,
+                cartViewModel = cartViewModel,
+                database = database
+            )
         }
         composable(Screen.Payment.route) { backStackEntry ->
             val orderId = backStackEntry.arguments?.getString("orderId")
             PaymentScreen(navController = navController, orderId = orderId, cartViewModel = cartViewModel)
+        }
+        // ภายใน NavHost { ... } ในไฟล์ AppNavHost
+        composable("merchant_home/{merchantId}") { backStackEntry ->
+            val mId = backStackEntry.arguments?.getString("merchantId")?.toIntOrNull() ?: 0
+            MerchantHomeScreen(navController, mId) // อย่าลืมสร้างหน้าเมนูหลักของร้านค้า
+        }
+
+        composable("manage_products/{merchantId}") { backStackEntry ->
+            val mId = backStackEntry.arguments?.getString("merchantId")?.toIntOrNull() ?: 0
+            ManageProductsScreen(navController, mId)
+        }
+
+        composable("add_product/{merchantId}") { backStackEntry ->
+            val mId = backStackEntry.arguments?.getString("merchantId")?.toIntOrNull() ?: 0
+            AddEditProductScreen(navController, mId)
+        }
+
+        composable("edit_product/{productId}") { backStackEntry ->
+            val pId = backStackEntry.arguments?.getString("productId")?.toIntOrNull() ?: 0
+            // สำหรับการแก้ไข เราดึง merchantId จากฐานข้อมูลในหน้า screen อยู่แล้ว ส่งเป็น 0 ไปก่อนได้
+            AddEditProductScreen(navController, merchantId = 0, productId = pId)
+        }
+
+        composable("edit_merchant_profile/{merchantId}") { backStackEntry ->
+            val mId = backStackEntry.arguments?.getString("merchantId")?.toIntOrNull() ?: 0
+            EditMerchantProfileScreen(navController, mId)
+        }
+
+        composable("merchant_orders/{merchantId}") { backStackEntry ->
+            val mId = backStackEntry.arguments?.getString("merchantId")?.toIntOrNull() ?: 0
+            MerchantOrderScreen(navController, mId, database)
         }
     }
 }
@@ -151,21 +213,41 @@ fun MainApp() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
+    // กำหนดว่าหน้าไหนจะโชว์ BottomBar (เฉพาะหน้าหลักของลูกค้า)
     val showBottomBar = currentRoute in listOf(Screen.Home.route, Screen.History.route, Screen.Account.route)
+    // หน้า Login ไม่โชว์ TopBar
     val showTopBar = currentRoute != "login"
 
+    // สร้าง Database Instance
     val database = remember {
         Room.databaseBuilder(
             context.applicationContext,
             AppDatabase::class.java,
             "threemusketeers_db"
-        ).build()
+        )
+            .fallbackToDestructiveMigration() // ช่วยให้แอปไม่ค้างเวลาเปลี่ยนโครงสร้างตาราง
+            .build()
     }
 
+    // เตรียม Repository และ ViewModels
     val repository = remember { CartRepository(database.cartDao(), database.orderDao()) }
     val cartViewModel: CartViewModel = viewModel(factory = CartViewModelFactory(repository))
+
+    // ดึง DAO มาเตรียมไว้ส่งให้ AppNavHost
     val userDao = database.userDao()
 
+    // ตรวจสอบว่าเป็นหน้าของ Merchant หรือไม่
+    val isMerchantRoute = currentRoute?.startsWith("merchant_home") == true ||
+            currentRoute?.startsWith("manage_products") == true ||
+            currentRoute?.startsWith("add_product") == true ||
+            currentRoute?.startsWith("edit_product") == true ||
+            currentRoute?.startsWith("edit_merchant_profile") == true ||
+            currentRoute?.startsWith("merchant_orders") == true // เพิ่มบรรทัดนี้ครับ
+
+    // ตรวจสอบว่าเป็นหน้าหลักของลูกค้าหรือไม่
+    val showCustomerBottomBar = currentRoute in listOf(Screen.Home.route, Screen.History.route, Screen.Account.route)
+
+    // จัดการเรื่องการโหลดข้อมูลตะกร้าเมื่อมีการเปลี่ยนหน้า
     LaunchedEffect(currentRoute) {
         if (currentRoute == Screen.Home.route) {
             val loggedInUserId = SessionManager.currentUser?.userId
@@ -182,16 +264,19 @@ fun MainApp() {
             }
         },
         bottomBar = {
-            if (showBottomBar) {
-                AppBottomNavigation(navController = navController, currentRoute = currentRoute)
+            if (isMerchantRoute) {
+                // ดึง merchantId จาก SessionManager หรือดึงจาก Route ปัจจุบัน
+                val merchantId = SessionManager.currentMerchant?.merchantId ?: 0
+                MerchantBottomNavigation(navController, currentRoute, merchantId)
+            } else if (currentRoute in listOf(Screen.Home.route, Screen.History.route, Screen.Account.route)) {
+                AppBottomNavigation(navController, currentRoute)
             }
         },
-        containerColor = Color.Transparent,
-        contentWindowInsets = WindowInsets(0.dp)
+        containerColor = Color.White // เปลี่ยนจาก Transparent เป็น White เพื่อความชัดเจน
     ) { innerPadding ->
         AppNavHost(
             navController = navController,
-            userDao = database.userDao(),
+            database = database,
             cartViewModel = cartViewModel,
             modifier = Modifier
                 .fillMaxSize()

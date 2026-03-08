@@ -20,34 +20,18 @@ import java.util.Date
 import java.util.Locale
 
 @Composable
-fun HistoryScreen(cartViewModel: CartViewModel) {
-    val userId = SessionManager.currentUser?.userId ?: 1
+fun HistoryScreen(cartViewModel: CartViewModel, database: AppDatabase) {
+    val userId = SessionManager.currentUser?.userId ?: 0
 
-    // โหลดประวัติสั่งซื้อของจริงตอนเปิดหน้าจอ
-    LaunchedEffect(Unit) {
+    LaunchedEffect(userId) {
         cartViewModel.loadOrders(userId)
     }
 
     val dbOrders by cartViewModel.orderHistory.collectAsState()
 
-    // นำข้อมูลแต่ละชิ้นใน DB มามัดรวมกันเป็นบิล 1 ใบ (จัดกลุ่มตาม timestamp)
+    // จัดกลุ่มออเดอร์ตาม timestamp เพื่อแสดงเป็นบิลใบเดียว
     val groupedOrders = remember(dbOrders) {
-        dbOrders.groupBy { it.timestamp }.map { (timestamp, items) ->
-            val firstItem = items.first()
-            val restaurantName = mockRestaurants.find { it.id == firstItem.merchantId.toString() }?.name ?: "ร้านอาหาร"
-
-            val sdf = SimpleDateFormat("dd MMM yyyy HH:mm", Locale("th", "TH"))
-            val dateStr = sdf.format(Date(timestamp))
-
-            OrderHistory(
-                orderId = "ORD-${firstItem.orderId}",
-                restaurantName = restaurantName,
-                date = dateStr,
-                itemsCount = items.sumOf { it.qty },
-                totalPrice = items.sumOf { it.totalAmount },
-                status = firstItem.status
-            )
-        }
+        dbOrders.groupBy { it.timestamp }
     }
 
     Column(
@@ -55,23 +39,42 @@ fun HistoryScreen(cartViewModel: CartViewModel) {
             .fillMaxSize()
             .background(Color(0xFFF8F8F8))
     ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // เอาออเดอร์จาก DB ผสมกับของปลอม (mockOrders) จะได้มีข้อมูลโชว์เยอะๆ
-            val allDisplayOrders = groupedOrders + mockOrders
-
-            items(allDisplayOrders) { order ->
-                OrderHistoryCard(order)
+        if (groupedOrders.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("ยังไม่มีประวัติการสั่งซื้อ", color = Color.Gray)
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // วนลูปตามกลุ่มของออเดอร์ (1 กลุ่ม = 1 บิล)
+                items(groupedOrders.keys.toList()) { timestamp ->
+                    val itemsInOrder = groupedOrders[timestamp] ?: emptyList()
+                    if (itemsInOrder.isNotEmpty()) {
+                        // ส่งลิสต์ของ OrderEntity เข้าไปใน Card
+                        OrderHistoryCard(orderItems = itemsInOrder, database = database)
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-fun OrderHistoryCard(order: OrderHistory) {
+fun OrderHistoryCard(orderItems: List<OrderEntity>, database: AppDatabase) {
+    val firstItem = orderItems.first()
+
+    // ดึงชื่อร้านค้าจาก DB (ใช้ produceState เพื่อโหลดชื่อร้าน)
+    val merchantName by produceState(initialValue = "กำลังโหลด...", firstItem.merchantId) {
+        val merchant = database.merchantDao().getMerchantById(firstItem.merchantId)
+        value = merchant?.storeName ?: "ร้านอาหาร"
+    }
+
+    val sdf = SimpleDateFormat("dd MMM yyyy HH:mm", Locale("th", "TH"))
+    val dateStr = sdf.format(Date(firstItem.timestamp))
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -84,21 +87,28 @@ fun OrderHistoryCard(order: OrderHistory) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(text = order.restaurantName, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                StatusBadge(order.status)
+                Text(text = merchantName, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFFD32F2F))
+                StatusBadge(firstItem.status)
             }
 
-            Text(text = order.date, fontSize = 14.sp, color = Color.Gray, modifier = Modifier.padding(top = 4.dp))
+            Text(text = dateStr, fontSize = 13.sp, color = Color.Gray, modifier = Modifier.padding(top = 4.dp))
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color(0xFFF5F5F5))
+
+            // แสดงรายการสินค้าในบิลนั้น (ถ้ามีหลายอย่าง)
+            orderItems.forEach { item ->
+                Text(text = "${item.productName} x ${item.qty}", fontSize = 14.sp)
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(text = "${order.itemsCount} รายการ", fontSize = 14.sp)
+                Text(text = "ทั้งหมด ${orderItems.sumOf { it.qty }} รายการ", fontSize = 14.sp)
                 Text(
-                    text = "฿${order.totalPrice}",
+                    text = "฿${String.format("%.2f", orderItems.sumOf { it.totalAmount })}",
                     fontWeight = FontWeight.Bold,
                     color = Color.Black,
                     fontSize = 16.sp
@@ -107,29 +117,25 @@ fun OrderHistoryCard(order: OrderHistory) {
         }
     }
 }
-
 @Composable
 fun StatusBadge(status: String) {
-    val bgColor = when (status) {
-        "กำลังดำเนินการ" -> Color(0xFFE3F2FD)
-        "จัดส่งสำเร็จ" -> Color(0xFFE8F5E9)
-        else -> Color(0xFFEEEEEE)
+    val (bgColor, textColor) = when (status) {
+        "จัดส่งสำเร็จ", "สำเร็จ" -> Color(0xFFE8F5E9) to Color(0xFF4CAF50)
+        "กำลังดำเนินการ", "กำลังเตรียมอาหาร" -> Color(0xFFFFF3E0) to Color(0xFFE65100)
+        "ยกเลิก" -> Color(0xFFFFEBEE) to Color(0xFFD32F2F)
+        else -> Color(0xFFEEEEEE) to Color(0xFF757575)
     }
 
-    val textColor = when (status) {
-        "กำลังดำเนินการ" -> Color(0xFF1976D2)
-        "จัดส่งสำเร็จ" -> Color(0xFF4CAF50)
-        else -> Color(0xFF757575)
-    }
-
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .background(bgColor, RoundedCornerShape(4.dp))
-            .padding(horizontal = 8.dp, vertical = 4.dp)
+    Surface(
+        color = bgColor,
+        shape = RoundedCornerShape(4.dp)
     ) {
-        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = textColor, modifier = Modifier.size(14.dp))
-        Spacer(modifier = Modifier.width(4.dp))
-        Text(text = status, color = textColor, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        Text(
+            text = status,
+            color = textColor,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+        )
     }
 }

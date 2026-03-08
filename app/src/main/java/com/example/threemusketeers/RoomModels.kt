@@ -1,5 +1,6 @@
 package com.example.threemusketeers
 
+import android.content.Context
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Entity
@@ -8,7 +9,9 @@ import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Database
+import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 // --- 1. ส่วนของ Entity ---
@@ -28,7 +31,8 @@ data class MerchantEntity(
     val storeName: String,
     val password: String,
     val address: String,
-    val phone: String
+    val phone: String,
+    val logoPath: String? = null // เพิ่มโลโก้ร้าน
 )
 
 @Entity(tableName = "products")
@@ -69,6 +73,8 @@ data class CartEntity(
     val qty: Int,
     val imagePath: String?
 )
+
+
 @Dao
 interface UserDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -79,9 +85,32 @@ interface UserDao {
 }
 
 @Dao
+interface MerchantDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun registerMerchant(merchant: MerchantEntity): Long
+
+    @Update
+    suspend fun updateMerchant(merchant: MerchantEntity)
+
+    @Query("SELECT * FROM merchants WHERE username = :user AND password = :pass LIMIT 1")
+    suspend fun loginMerchant(user: String, pass: String): MerchantEntity?
+
+    @Query("SELECT * FROM merchants WHERE merchantId = :mId LIMIT 1")
+    suspend fun getMerchantById(mId: Int): MerchantEntity?
+
+    @Query("SELECT * FROM merchants")
+    fun getAllMerchants(): Flow<List<MerchantEntity>>
+
+
+}
+
+@Dao
 interface ProductDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertOrUpdateProduct(product: ProductEntity)
+    suspend fun insertProduct(product: ProductEntity)
+
+    @Update
+    suspend fun updateProduct(product: ProductEntity)
 
     @Delete
     suspend fun deleteProduct(product: ProductEntity)
@@ -94,9 +123,6 @@ interface ProductDao {
 
     @Query("SELECT * FROM products WHERE productId = :pId")
     suspend fun getProductById(pId: Int): ProductEntity?
-
-    @Query("SELECT * FROM products WHERE discountPrice IS NOT NULL AND discountPrice > 0")
-    fun getPromotionProducts(): Flow<List<ProductEntity>>
 }
 
 @Dao
@@ -109,10 +135,15 @@ interface OrderDao {
 
     @Query("SELECT * FROM orders WHERE merchantId = :mId ORDER BY timestamp DESC")
     fun getOrdersByMerchant(mId: Int): Flow<List<OrderEntity>>
+
+    @Query("UPDATE orders SET status = :newStatus WHERE orderId = :oId")
+    suspend fun updateOrderStatus(oId: Int, newStatus: String)
 }
 
 @Dao
 interface CartDao {
+    // ... ฟังก์ชันอื่นๆ ที่มีอยู่แล้ว ...
+
     @Query("SELECT * FROM cart WHERE userId = :uId")
     suspend fun getCartByUserId(uId: Int): List<CartEntity>
 
@@ -122,21 +153,50 @@ interface CartDao {
     @Query("DELETE FROM cart WHERE userId = :uId AND productId = :pId")
     suspend fun removeProductFromCart(uId: Int, pId: Int)
 
-    @Query("DELETE FROM cart WHERE userId = :uId AND merchantId = :mId")
-    suspend fun clearCartByMerchant(uId: Int, mId: Int)
+    // --- เพิ่มบรรทัดนี้ลงไปเพื่อให้ Repository หายแดง ---
+    @Query("DELETE FROM cart WHERE userId = :userId AND merchantId = :merchantId")
+    suspend fun clearCartByMerchant(userId: Int, merchantId: Int)
 
-    @Query("SELECT DISTINCT merchantId FROM cart WHERE userId = :uId")
-    suspend fun getMerchantIdsInCart(uId: Int): List<Int>
+    @Query("DELETE FROM cart")
+    suspend fun clearAll()
+
+
 }
 
 @Database(
-    entities = [UserEntity::class, MerchantEntity::class, ProductEntity::class, OrderEntity::class, CartEntity::class],
-    version = 1,
+    entities = [
+        UserEntity::class,
+        MerchantEntity::class,
+        ProductEntity::class,
+        OrderEntity::class,
+        CartEntity::class
+    ],
+    version = 4, // เพิ่มเป็น 4 เพราะมีการเปลี่ยนโครงสร้างตาราง
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
+    abstract fun userDao(): UserDao
+    abstract fun merchantDao(): MerchantDao
     abstract fun productDao(): ProductDao
     abstract fun orderDao(): OrderDao
     abstract fun cartDao(): CartDao
-    abstract fun userDao(): UserDao
+
+    companion object {
+        @Volatile
+        private var Instance: AppDatabase? = null
+
+        fun getDatabase(context: Context): AppDatabase {
+            return Instance ?: synchronized(this) {
+                val instance = Room.databaseBuilder(
+                    context.applicationContext,
+                    AppDatabase::class.java,
+                    "threemusketeers_db" // ใช้ชื่อเดียวกับเพื่อนเพื่อความเข้ากันได้
+                )
+                    .fallbackToDestructiveMigration()
+                    .build()
+                Instance = instance
+                instance
+            }
+        }
+    }
 }

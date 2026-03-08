@@ -22,19 +22,31 @@ import java.util.Locale
 @Composable
 fun PaymentScreen(
     navController: NavHostController,
-    orderId: String?,
+    orderId: String?, // รับค่า merchantId ผ่าน orderId มาจาก StoreScreen
     cartViewModel: CartViewModel
 ) {
     var selectedPaymentMethod by remember { mutableIntStateOf(1) }
     var showSuccessDialog by remember { mutableStateOf(false) }
 
-    val userId = SessionManager.currentUser?.userId ?: 1
-    val merchantIdInt = orderId?.toIntOrNull() ?: 1
+    // 🌟 ดึงข้อมูล User จาก Session จริง (ถ้าไม่มีให้ Default เป็น 0 หรือจัดการตาม Logic แอป)
+    val currentUser = SessionManager.currentUser
+    val userId = currentUser?.userId ?: 0
+    val merchantIdInt = orderId?.toIntOrNull() ?: 0
 
     val allCartItems by cartViewModel.cartItems.collectAsState()
 
+    // กรองสินค้าเฉพาะร้านที่กำลังจะจ่ายเงิน
     val storeCartItems = allCartItems.filter { it.merchantId == merchantIdInt }
     val totalPrice = storeCartItems.sumOf { it.price * it.qty }
+
+    // 🛡️ ป้องกันกรณีไม่มี User หรือไม่มีสินค้าในตะกร้า
+    LaunchedEffect(currentUser, storeCartItems) {
+        if (currentUser == null) {
+            navController.navigate("login") { popUpTo(0) { inclusive = true } }
+        } else if (storeCartItems.isEmpty() && !showSuccessDialog) {
+            navController.popBackStack()
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
@@ -51,7 +63,7 @@ fun PaymentScreen(
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
                     Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                        storeCartItems.forEachIndexed { index, item -> // 🌟 วนลูปเฉพาะร้านนี้
+                        storeCartItems.forEachIndexed { index, item ->
                             Row(
                                 modifier = Modifier
                                     .padding(horizontal = 16.dp, vertical = 12.dp)
@@ -66,7 +78,7 @@ fun PaymentScreen(
                                 Text(
                                     text = "฿${item.price * item.qty}",
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF006400)
+                                    color = Color(0xFFD32F2F) // ปรับสีให้เข้ากับธีมหลัก
                                 )
                             }
                             if (index != storeCartItems.lastIndex) {
@@ -89,20 +101,20 @@ fun PaymentScreen(
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color.Red)
+                            Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color(0xFFD32F2F))
                             Spacer(modifier = Modifier.width(8.dp))
-                            val currentName = SessionManager.currentUser?.username ?: mockUser.username
-                            Text(text = currentName, fontWeight = FontWeight.Bold)
+                            // 🌟 ใช้ข้อมูลชื่อจริงจาก DB/Session
+                            Text(text = currentUser?.username ?: "", fontWeight = FontWeight.Bold)
                         }
-                        val currentAddress = SessionManager.currentUser?.address ?: mockUser.address
+                        // 🌟 ใช้ที่อยู่จริงจาก DB/Session
                         Text(
-                            text = currentAddress,
+                            text = currentUser?.address ?: "กรุณาระบุที่อยู่",
                             fontSize = 14.sp,
                             color = Color.Gray,
                             modifier = Modifier.padding(top = 4.dp)
                         )
                         HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-                        Text(text = "เวลาจัดส่งโดยประมาณ: 25-30 นาที", fontSize = 14.sp)
+                        Text(text = "เวลาจัดส่งโดยประมาณ: 20-30 นาที", fontSize = 14.sp)
                     }
                 }
             }
@@ -131,6 +143,7 @@ fun PaymentScreen(
             }
         }
 
+        // แถบปุ่มชำระเงินด้านล่าง
         Surface(
             modifier = Modifier.align(Alignment.BottomCenter),
             shadowElevation = 8.dp,
@@ -143,12 +156,12 @@ fun PaymentScreen(
                     .padding(16.dp)
                     .navigationBarsPadding()
                     .height(56.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFC107)),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text(
                     text = "ยืนยันการชำระเงิน (รวม ฿$totalPrice)",
-                    color = Color.Black,
+                    color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp
                 )
@@ -158,23 +171,23 @@ fun PaymentScreen(
 
     if (showSuccessDialog) {
         AlertDialog(
-            onDismissRequest = { /* ไม่ให้ปิดด้วยการกดข้างนอก */ },
+            onDismissRequest = { },
             title = { Text(text = "คำสั่งซื้อสำเร็จ", fontWeight = FontWeight.Bold) },
-            text = { Text("กำลังเตรียมจัดส่งอาหารให้คุณ กรุณารอสักครู่") },
+            text = { Text("ร้านค้าได้รับคำสั่งซื้อของคุณแล้ว กำลังเตรียมจัดส่งอาหารให้คุณ") },
             confirmButton = {
                 Button(
                     onClick = {
                         showSuccessDialog = false
-
+                        // 🌟 สร้าง Order ลง Database และเคลียร์ตะกร้าแยกตามร้านค้า
                         cartViewModel.createOrderAndCheckout(userId, merchantIdInt)
 
                         navController.navigate(Screen.History.route) {
                             popUpTo(Screen.Home.route) { inclusive = false }
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFC107))
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
                 ) {
-                    Text("ตกลง", color = Color.Black)
+                    Text("ตกลง", color = Color.White)
                 }
             }
         )
