@@ -17,6 +17,7 @@ data class FoodMenu(
     val id: Int,
     val name: String,
     val price: Double,
+    val category: String,
     val imageRes: String? = null
 )
 
@@ -44,9 +45,11 @@ val mockRestaurants = listOf(
         rating = 4.8, deliveryTime = "15-20 นาที", priceLevel = "฿",
         address = "หน้า ม.เกษตร ศรีราชา", isAd = true,
         menus = listOf(
-            FoodMenu(101, "ข้าวกะเพราหมูสับไข่ดาว", 50.0),
-            FoodMenu(102, "ข้าวผัดต้มยำทะเล", 60.0),
-            FoodMenu(103, "สุกี้แห้งไก่", 45.0)
+            // 🌟 ปรับปรุง Mock Data ให้หมวดหมู่ตรงกับระบบของเพื่อน
+            FoodMenu(101, "ข้าวกะเพราหมูสับไข่ดาว", 50.0, "อาหารตามสั่ง"),
+            FoodMenu(102, "ข้าวผัดต้มยำทะเล", 60.0, "อาหารตามสั่ง"),
+            FoodMenu(103, "ชาเย็น", 25.0, "เครื่องดื่ม"),
+            FoodMenu(104, "บัวลอยไข่หวาน", 35.0, "ของหวาน")
         )
     ),
     Restaurant(
@@ -54,9 +57,9 @@ val mockRestaurants = listOf(
         rating = 4.5, deliveryTime = "20-30 นาที", priceLevel = "฿฿",
         address = "อ่าวอุดม",
         menus = listOf(
-            FoodMenu(201, "ส้มตำไทยไข่เค็ม", 50.0),
-            FoodMenu(202, "คอหมูย่าง", 80.0),
-            FoodMenu(203, "น้ำตกเนื้อ", 90.0)
+            FoodMenu(201, "ส้มตำไทยไข่เค็ม", 50.0, "อาหารตามสั่ง"),
+            FoodMenu(202, "เฟรนช์ฟรายส์", 40.0, "ฟาสต์ฟู้ด"),
+            FoodMenu(203, "น้ำตกเนื้อ", 90.0, "อาหารตามสั่ง")
         )
     )
 )
