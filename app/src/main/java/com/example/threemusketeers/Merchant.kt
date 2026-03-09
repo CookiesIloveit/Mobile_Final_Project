@@ -1,6 +1,7 @@
 package com.example.threemusketeers
 
 import android.content.Intent
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -484,6 +485,7 @@ fun EditMerchantProfileScreen(navController: NavHostController, merchantId: Int)
     val backgroundColor = Color(0xFFFBFBFB)
 
     LaunchedEffect(merchantId) {
+        Log.d("DEBUG_MERCHANT", "รับ ID เข้ามา: $merchantId")
         val merchant = db.merchantDao().getMerchantById(merchantId)
         merchant?.let {
             originalMerchant = it

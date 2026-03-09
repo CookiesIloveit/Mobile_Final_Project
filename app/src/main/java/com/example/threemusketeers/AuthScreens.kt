@@ -71,7 +71,7 @@ fun CustomerRegisterScreen(navController: NavHostController, userDao: UserDao) {
             letterSpacing = (-1).sp
         )
         Text(
-            "Join Three Musketeers family today",
+            "Join Coconut family today",
             fontSize = 14.sp,
             color = Color.Gray
         )
@@ -257,7 +257,7 @@ fun LoginScreen(navController: NavHostController, userDao: UserDao, merchantDao:
         )
         Spacer(modifier = Modifier.height(12.dp))
         Text(
-            "Three Musketeers",
+            "Coconut",
             fontSize = 28.sp,
             fontWeight = FontWeight.Black,
             color = Color(0xFF2D2D2D),

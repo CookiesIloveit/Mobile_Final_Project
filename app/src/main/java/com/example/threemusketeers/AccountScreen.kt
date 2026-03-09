@@ -72,7 +72,7 @@ fun AccountScreen(navController: NavHostController) {
                     letterSpacing = (-0.5).sp
                 )
                 Text(
-                    text = "Three Musketeers Member",
+                    text = "Coconut Member",
                     color = Color.White.copy(alpha = 0.7f),
                     fontSize = 14.sp
                 )

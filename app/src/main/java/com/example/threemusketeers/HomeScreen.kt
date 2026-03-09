@@ -30,11 +30,8 @@ import coil.compose.AsyncImage
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(navController: NavHostController, database: AppDatabase) {
-    val categories = listOf("ทั้งหมด", "อาหารตามสั่ง", "ก๋วยเตี๋ยว", "อาหารญี่ปุ่น", "เครื่องดื่ม", "ของหวาน", "ฟาสต์ฟู้ด")
-    var selectedCategory by remember { mutableStateOf("ทั้งหมด") }
 
     val merchants by database.merchantDao().getAllMerchants().collectAsState(initial = emptyList())
-    val primaryColor = Color(0xFFE53935) // สีแดงมินิมัลที่เราใช้ในหน้าอื่น ๆ
 
     Column(
         modifier = Modifier
@@ -55,34 +52,9 @@ fun HomeScreen(navController: NavHostController, database: AppDatabase) {
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
                     color = Color(0xFF2D2D2D)
                 )
-
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    items(categories) { category ->
-                        val isSelected = selectedCategory == category
-                        Surface(
-                            modifier = Modifier.clickable { selectedCategory = category },
-                            shape = RoundedCornerShape(20.dp),
-                            color = if (isSelected) primaryColor else Color(0xFFF5F5F5),
-                            border = if (isSelected) null else BorderStroke(1.dp, Color(0xFFEEEEEE))
-                        ) {
-                            Text(
-                                text = category,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                color = if (isSelected) Color.White else Color.Gray,
-                                fontSize = 13.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                            )
-                        }
-                    }
-                }
             }
         }
 
-        // --- รายการร้านอาหาร ---
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 20.dp),

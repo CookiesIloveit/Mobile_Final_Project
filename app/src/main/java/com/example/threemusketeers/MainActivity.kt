@@ -221,9 +221,12 @@ fun MainApp() {
     Scaffold(
         bottomBar = {
             if (isMerchantRoute) {
-                // ดึง merchantId จาก SessionManager หรือดึงจาก Route ปัจจุบัน
-                val merchantId = SessionManager.currentMerchant?.merchantId ?: 0
-                MerchantBottomNavigation(navController, currentRoute, merchantId)
+                // 🌟 ดึง ID จาก Navigation BackStack แทน Session
+                val merchantIdFromRoute = navBackStackEntry?.arguments?.getString("merchantId")?.toIntOrNull()
+                    ?: SessionManager.currentMerchant?.merchantId // สำรองถ้าดึงจาก route ไม่ได้
+                    ?: 0
+
+                MerchantBottomNavigation(navController, currentRoute, merchantIdFromRoute)
             } else if (currentRoute in listOf(Screen.Home.route, Screen.History.route, Screen.Account.route)) {
                 AppBottomNavigation(navController, currentRoute)
             }
