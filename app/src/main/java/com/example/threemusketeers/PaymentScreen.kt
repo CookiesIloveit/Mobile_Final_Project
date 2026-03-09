@@ -1,8 +1,10 @@
 package com.example.threemusketeers
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
@@ -22,24 +24,22 @@ import java.util.Locale
 @Composable
 fun PaymentScreen(
     navController: NavHostController,
-    orderId: String?, // รับค่า merchantId ผ่าน orderId มาจาก StoreScreen
+    orderId: String?,
     cartViewModel: CartViewModel
 ) {
     var selectedPaymentMethod by remember { mutableIntStateOf(1) }
     var showSuccessDialog by remember { mutableStateOf(false) }
 
-    // 🌟 ดึงข้อมูล User จาก Session จริง (ถ้าไม่มีให้ Default เป็น 0 หรือจัดการตาม Logic แอป)
     val currentUser = SessionManager.currentUser
     val userId = currentUser?.userId ?: 0
     val merchantIdInt = orderId?.toIntOrNull() ?: 0
+    val primaryColor = Color(0xFFE53935)
+    val backgroundColor = Color(0xFFFBFBFB)
 
     val allCartItems by cartViewModel.cartItems.collectAsState()
-
-    // กรองสินค้าเฉพาะร้านที่กำลังจะจ่ายเงิน
     val storeCartItems = allCartItems.filter { it.merchantId == merchantIdInt }
     val totalPrice = storeCartItems.sumOf { it.price * it.qty }
 
-    // 🛡️ ป้องกันกรณีไม่มี User หรือไม่มีสินค้าในตะกร้า
     LaunchedEffect(currentUser, storeCartItems) {
         if (currentUser == null) {
             navController.navigate("login") { popUpTo(0) { inclusive = true } }
@@ -48,93 +48,89 @@ fun PaymentScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize().background(backgroundColor)) {
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0xFFF8F8F8))
-                .padding(bottom = 100.dp)
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 120.dp) // เผื่อที่ให้ปุ่มด้านล่าง
         ) {
+            // ส่วนหัว (Header)
             item {
-                SectionTitle("รายการอาหาร")
-                Card(
-                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                        storeCartItems.forEachIndexed { index, item ->
-                            Row(
-                                modifier = Modifier
-                                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                                    .fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column {
-                                    Text(text = item.productName, fontWeight = FontWeight.Medium)
-                                    Text(text = "x ${item.qty}", fontSize = 12.sp, color = Color.Gray)
-                                }
-                                Text(
-                                    text = "฿${item.price * item.qty}",
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFFD32F2F) // ปรับสีให้เข้ากับธีมหลัก
-                                )
+                Text(
+                    text = "สรุปคำสั่งซื้อ",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Black,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp),
+                    color = Color(0xFF2D2D2D)
+                )
+            }
+
+            // 1. รายการอาหาร
+            item {
+                PaymentSectionCard(title = "รายการอาหาร") {
+                    storeCartItems.forEachIndexed { index, item ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(text = item.productName, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                Text(text = "จำนวน ${item.qty}", fontSize = 13.sp, color = Color.Gray)
                             }
-                            if (index != storeCartItems.lastIndex) {
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(horizontal = 16.dp),
-                                    color = Color(0xFFF5F5F5)
-                                )
-                            }
+                            Text(
+                                text = "฿${String.format("%.2f", item.price * item.qty)}",
+                                fontWeight = FontWeight.Black,
+                                color = Color(0xFF2D2D2D)
+                            )
+                        }
+                        if (index != storeCartItems.lastIndex) {
+                            HorizontalDivider(color = Color(0xFFF5F5F5))
                         }
                     }
                 }
             }
 
+            // 2. รายละเอียดจัดส่ง
             item {
-                SectionTitle("รายละเอียดการจัดส่ง")
-                Card(
-                    modifier = Modifier.padding(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color(0xFFD32F2F))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            // 🌟 ใช้ข้อมูลชื่อจริงจาก DB/Session
+                PaymentSectionCard(title = "ที่อยู่จัดส่ง") {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = CircleShape,
+                            color = primaryColor.copy(alpha = 0.1f),
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.LocationOn,
+                                contentDescription = null,
+                                tint = primaryColor,
+                                modifier = Modifier.padding(8.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
                             Text(text = currentUser?.username ?: "", fontWeight = FontWeight.Bold)
+                            Text(
+                                text = currentUser?.address ?: "กรุณาระบุที่อยู่",
+                                fontSize = 13.sp,
+                                color = Color.Gray
+                            )
                         }
-                        // 🌟 ใช้ที่อยู่จริงจาก DB/Session
-                        Text(
-                            text = currentUser?.address ?: "กรุณาระบุที่อยู่",
-                            fontSize = 14.sp,
-                            color = Color.Gray,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-                        Text(text = "เวลาจัดส่งโดยประมาณ: 20-30 นาที", fontSize = 14.sp)
                     }
                 }
             }
 
+            // 3. วิธีชำระเงิน
             item {
-                SectionTitle("วิธีการชำระเงิน")
-                Card(
-                    modifier = Modifier.padding(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
+                PaymentSectionCard(title = "ช่องทางชำระเงิน") {
                     Column {
-                        PaymentOption(
+                        PaymentOptionMinimal(
                             title = "เก็บเงินปลายทาง",
                             selected = selectedPaymentMethod == 1,
                             onClick = { selectedPaymentMethod = 1 }
                         )
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                        PaymentOption(
-                            title = "ชำระเงินผ่านธนาคาร",
+                        HorizontalDivider(color = Color(0xFFF5F5F5))
+                        PaymentOptionMinimal(
+                            title = "ชำระผ่านธนาคาร (QR Code)",
                             selected = selectedPaymentMethod == 2,
                             onClick = { selectedPaymentMethod = 2 }
                         )
@@ -143,51 +139,52 @@ fun PaymentScreen(
             }
         }
 
-        // แถบปุ่มชำระเงินด้านล่าง
-        Surface(
-            modifier = Modifier.align(Alignment.BottomCenter),
-            shadowElevation = 8.dp,
-            color = Color.White
+        // ปุ่มยืนยันด้านล่างดีไซน์ Floating
+        Card(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(20.dp),
+            shape = RoundedCornerShape(24.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
         ) {
             Button(
                 onClick = { showSuccessDialog = true },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-                    .navigationBarsPadding()
-                    .height(56.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
-                shape = RoundedCornerShape(12.dp)
+                modifier = Modifier.fillMaxWidth().height(60.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
+                shape = RoundedCornerShape(24.dp)
             ) {
-                Text(
-                    text = "ยืนยันการชำระเงิน (รวม ฿$totalPrice)",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("ยืนยันคำสั่งซื้อ", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("฿${String.format("%.2f", totalPrice)}", fontWeight = FontWeight.Black, fontSize = 18.sp)
+                }
             }
         }
     }
 
+    // Success Dialog (มินิมัล)
     if (showSuccessDialog) {
         AlertDialog(
             onDismissRequest = { },
-            title = { Text(text = "คำสั่งซื้อสำเร็จ", fontWeight = FontWeight.Bold) },
-            text = { Text("ร้านค้าได้รับคำสั่งซื้อของคุณแล้ว กำลังเตรียมจัดส่งอาหารให้คุณ") },
+            shape = RoundedCornerShape(28.dp),
+            title = { Text("ชำระเงินสำเร็จ", fontWeight = FontWeight.Bold) },
+            text = { Text("เราได้รับคำสั่งซื้อแล้ว ร้านค้ากำลังเตรียมอาหารให้คุณ") },
             confirmButton = {
-                Button(
+                TextButton(
                     onClick = {
                         showSuccessDialog = false
-                        // 🌟 สร้าง Order ลง Database และเคลียร์ตะกร้าแยกตามร้านค้า
                         cartViewModel.createOrderAndCheckout(userId, merchantIdInt)
-
                         navController.navigate(Screen.History.route) {
                             popUpTo(Screen.Home.route) { inclusive = false }
                         }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
+                    }
                 ) {
-                    Text("ตกลง", color = Color.White)
+                    Text("ติดตามสถานะ", color = primaryColor, fontWeight = FontWeight.Bold)
                 }
             }
         )
@@ -195,25 +192,43 @@ fun PaymentScreen(
 }
 
 @Composable
-fun SectionTitle(title: String) {
-    Text(
-        text = title,
-        fontSize = 16.sp,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(start = 16.dp, top = 16.dp)
-    )
+fun PaymentSectionCard(title: String, content: @Composable () -> Unit) {
+    Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
+        Text(
+            text = title,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.Gray,
+            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
+        )
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                content()
+            }
+        }
+    }
 }
 
 @Composable
-fun PaymentOption(title: String, selected: Boolean, onClick: () -> Unit) {
+fun PaymentOptionMinimal(title: String, selected: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp),
+            .clickable { onClick() }
+            .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(text = title)
-        RadioButton(selected = selected, onClick = onClick)
+        Text(text = title, fontSize = 15.sp, color = if (selected) Color.Black else Color.Gray)
+        RadioButton(
+            selected = selected,
+            onClick = onClick,
+            colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFE53935))
+        )
     }
 }

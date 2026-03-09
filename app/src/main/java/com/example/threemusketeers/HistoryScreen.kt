@@ -6,7 +6,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,10 +17,16 @@ import androidx.compose.ui.unit.sp
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.filled.History
+
 
 @Composable
 fun HistoryScreen(cartViewModel: CartViewModel, database: AppDatabase) {
     val userId = SessionManager.currentUser?.userId ?: 0
+    val backgroundColor = Color(0xFFFBFBFB) // สีพื้นหลังขาวนวลสไตล์มินิมัล
 
     LaunchedEffect(userId) {
         cartViewModel.loadOrders(userId)
@@ -37,24 +42,45 @@ fun HistoryScreen(cartViewModel: CartViewModel, database: AppDatabase) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF8F8F8))
+            .background(backgroundColor)
     ) {
+        // ส่วนหัวหน้าจอแบบ Minimal
+        Text(
+            text = "ประวัติการสั่งซื้อ",
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Black,
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp),
+            color = Color(0xFF2D2D2D)
+        )
+
         if (groupedOrders.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("ยังไม่มีประวัติการสั่งซื้อ", color = Color.Gray)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        imageVector = Icons.Default.History,
+                        contentDescription = null,
+                        modifier = Modifier.size(64.dp), // กำหนดขนาดที่นี่
+                        tint = Color.LightGray
+                    )
+                    Text("ยังไม่มีประวัติการสั่งซื้อ", color = Color.Gray, modifier = Modifier.padding(top = 8.dp))
+                }
             }
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                contentPadding = PaddingValues(
+                    start = 20.dp,
+                    end = 20.dp,
+                    bottom = 100.dp,
+                    top = 0.dp // หรือใส่ค่าที่ต้องการ
+                ),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // วนลูปตามกลุ่มของออเดอร์ (1 กลุ่ม = 1 บิล)
-                items(groupedOrders.keys.toList()) { timestamp ->
+                val sortedTimestamps = groupedOrders.keys.toList().sortedDescending()
+                items(sortedTimestamps) { timestamp ->
                     val itemsInOrder = groupedOrders[timestamp] ?: emptyList()
                     if (itemsInOrder.isNotEmpty()) {
-                        // ส่งลิสต์ของ OrderEntity เข้าไปใน Card
-                        OrderHistoryCard(orderItems = itemsInOrder, database = database)
+                        OrderHistoryCardMinimal(orderItems = itemsInOrder, database = database)
                     }
                 }
             }
@@ -63,79 +89,107 @@ fun HistoryScreen(cartViewModel: CartViewModel, database: AppDatabase) {
 }
 
 @Composable
-fun OrderHistoryCard(orderItems: List<OrderEntity>, database: AppDatabase) {
+fun OrderHistoryCardMinimal(orderItems: List<OrderEntity>, database: AppDatabase) {
     val firstItem = orderItems.first()
+    val primaryRed = Color(0xFFE53935) // สีแดงมินิมัลที่เราใช้
 
-    // ดึงชื่อร้านค้าจาก DB (ใช้ produceState เพื่อโหลดชื่อร้าน)
-    val merchantName by produceState(initialValue = "กำลังโหลด...", firstItem.merchantId) {
+    val merchantName by produceState(initialValue = "Loading...", firstItem.merchantId) {
         val merchant = database.merchantDao().getMerchantById(firstItem.merchantId)
-        value = merchant?.storeName ?: "ร้านอาหาร"
+        value = merchant?.storeName ?: "Restaurant"
     }
 
-    val sdf = SimpleDateFormat("dd MMM yyyy HH:mm", Locale("th", "TH"))
+    val sdf = SimpleDateFormat("dd MMM yyyy • HH:mm", Locale("th", "TH"))
     val dateStr = sdf.format(Date(firstItem.timestamp))
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        shape = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp) // เงาเบา ๆ เพิ่มมิติ
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = merchantName,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        color = Color(0xFF2D2D2D)
+                    )
+                    Text(
+                        text = dateStr,
+                        fontSize = 12.sp,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+                StatusBadgeMinimal(firstItem.status)
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // แสดงรายการสินค้าแบบสะอาดตา
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFFF9F9F9), RoundedCornerShape(12.dp))
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                orderItems.forEach { item ->
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(text = item.productName, fontSize = 13.sp, color = Color.DarkGray)
+                        Text(text = "x${item.qty}", fontSize = 13.sp, color = Color.Gray)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(text = merchantName, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFFD32F2F))
-                StatusBadge(firstItem.status)
-            }
-
-            Text(text = dateStr, fontSize = 13.sp, color = Color.Gray, modifier = Modifier.padding(top = 4.dp))
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color(0xFFF5F5F5))
-
-            // แสดงรายการสินค้าในบิลนั้น (ถ้ามีหลายอย่าง)
-            orderItems.forEach { item ->
-                Text(text = "${item.productName} x ${item.qty}", fontSize = 14.sp)
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(text = "ทั้งหมด ${orderItems.sumOf { it.qty }} รายการ", fontSize = 14.sp)
+                Text(
+                    text = "ยอดรวมสุทธิ",
+                    fontSize = 14.sp,
+                    color = Color.Gray
+                )
                 Text(
                     text = "฿${String.format("%.2f", orderItems.sumOf { it.totalAmount })}",
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Black,
-                    fontSize = 16.sp
+                    fontWeight = FontWeight.Black,
+                    color = primaryRed,
+                    fontSize = 18.sp
                 )
             }
         }
     }
 }
+
 @Composable
-fun StatusBadge(status: String) {
+fun StatusBadgeMinimal(status: String) {
     val (bgColor, textColor) = when (status) {
-        "จัดส่งสำเร็จ", "สำเร็จ" -> Color(0xFFE8F5E9) to Color(0xFF4CAF50)
-        "กำลังดำเนินการ", "กำลังเตรียมอาหาร" -> Color(0xFFFFF3E0) to Color(0xFFE65100)
-        "ยกเลิก" -> Color(0xFFFFEBEE) to Color(0xFFD32F2F)
-        else -> Color(0xFFEEEEEE) to Color(0xFF757575)
+        "จัดส่งสำเร็จ", "สำเร็จ" -> Color(0xFFE8F5E9) to Color(0xFF43A047)
+        "กำลังดำเนินการ", "กำลังเตรียมอาหาร" -> Color(0xFFFFF3E0) to Color(0xFFFB8C00)
+        "ยกเลิก" -> Color(0xFFFFEBEE) to Color(0xFFE53935)
+        else -> Color(0xFFF5F5F5) to Color(0xFF757575)
     }
 
     Surface(
         color = bgColor,
-        shape = RoundedCornerShape(4.dp)
+        shape = RoundedCornerShape(8.dp)
     ) {
         Text(
             text = status,
             color = textColor,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
         )
     }
 }

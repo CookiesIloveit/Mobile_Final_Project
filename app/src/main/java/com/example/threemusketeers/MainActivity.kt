@@ -128,42 +128,6 @@ fun AppNavHost(navController: NavHostController,
     }
 }
 
-// (AppTopBar และ AppBottomNavigation เหมือนเดิมทุกประการ ย่อไว้เพื่อความกระชับ)
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AppTopBar(navController: NavHostController, currentRoute: String?) {
-    val title = when {
-        currentRoute == Screen.Home.route -> "หน้าแรก"
-        currentRoute == Screen.History.route -> "ประวัติการสั่งซื้อ"
-        currentRoute == Screen.Account.route -> "บัญชีของฉัน"
-        currentRoute?.startsWith("store/") == true -> "รายละเอียดร้านอาหาร"
-        currentRoute?.startsWith("payment/") == true -> "ชำระเงิน"
-        currentRoute == "login" -> "เข้าสู่ระบบ"
-        currentRoute == "customer_register" -> "สมัครสมาชิก"
-        else -> "Three Musketeers"
-    }
-
-    val showBackButton = currentRoute?.startsWith("store/") == true ||
-            currentRoute?.startsWith("payment/") == true ||
-            currentRoute == "customer_register"
-
-    TopAppBar(
-        title = { Text(text = title) },
-        navigationIcon = {
-            if (showBackButton) {
-                IconButton(onClick = { navController.navigateUp() }) {
-                    Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ย้อนกลับ")
-                }
-            }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = Color(0xFFD32F2F),
-            titleContentColor = Color.White,
-            navigationIconContentColor = Color.White
-        )
-    )
-}
-
 @Composable
 fun AppBottomNavigation(navController: NavHostController, currentRoute: String?) {
     NavigationBar(containerColor = Color.White) {
@@ -215,8 +179,6 @@ fun MainApp() {
 
     // กำหนดว่าหน้าไหนจะโชว์ BottomBar (เฉพาะหน้าหลักของลูกค้า)
     val showBottomBar = currentRoute in listOf(Screen.Home.route, Screen.History.route, Screen.Account.route)
-    // หน้า Login ไม่โชว์ TopBar
-    val showTopBar = currentRoute != "login"
 
     // สร้าง Database Instance
     val database = remember {
@@ -256,13 +218,7 @@ fun MainApp() {
             }
         }
     }
-
     Scaffold(
-        topBar = {
-            if (showTopBar) {
-                AppTopBar(navController = navController, currentRoute = currentRoute)
-            }
-        },
         bottomBar = {
             if (isMerchantRoute) {
                 // ดึง merchantId จาก SessionManager หรือดึงจาก Route ปัจจุบัน
@@ -280,7 +236,10 @@ fun MainApp() {
             cartViewModel = cartViewModel,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .then(
+                    if (isMerchantRoute) Modifier.padding(bottom = innerPadding.calculateBottomPadding())
+                    else Modifier.padding(innerPadding)
+                )
         )
     }
 }
