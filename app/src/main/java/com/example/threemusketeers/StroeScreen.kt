@@ -41,7 +41,6 @@ fun StoreScreen(
     val merchantIdInt = storeId?.toIntOrNull() ?: 0
     val primaryColor = Color(0xFFE53935)
 
-    // --- ดึงข้อมูลจาก Database ---
     var merchant by remember { mutableStateOf<MerchantEntity?>(null) }
     LaunchedEffect(merchantIdInt) {
         merchant = database.merchantDao().getMerchantById(merchantIdInt)

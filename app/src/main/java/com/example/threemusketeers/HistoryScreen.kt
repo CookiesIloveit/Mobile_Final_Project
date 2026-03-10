@@ -34,7 +34,6 @@ fun HistoryScreen(cartViewModel: CartViewModel, database: AppDatabase) {
 
     val dbOrders by cartViewModel.orderHistory.collectAsState()
 
-    // จัดกลุ่มออเดอร์ตาม timestamp เพื่อแสดงเป็นบิลใบเดียว
     val groupedOrders = remember(dbOrders) {
         dbOrders.groupBy { it.timestamp }
     }
@@ -44,7 +43,6 @@ fun HistoryScreen(cartViewModel: CartViewModel, database: AppDatabase) {
             .fillMaxSize()
             .background(backgroundColor)
     ) {
-        // ส่วนหัวหน้าจอแบบ Minimal
         Text(
             text = "ประวัติการสั่งซื้อ",
             fontSize = 24.sp,
@@ -132,7 +130,6 @@ fun OrderHistoryCardMinimal(orderItems: List<OrderEntity>, database: AppDatabase
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // แสดงรายการสินค้าแบบสะอาดตา
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -174,22 +171,30 @@ fun OrderHistoryCardMinimal(orderItems: List<OrderEntity>, database: AppDatabase
 @Composable
 fun StatusBadgeMinimal(status: String) {
     val (bgColor, textColor) = when (status) {
-        "จัดส่งสำเร็จ", "สำเร็จ" -> Color(0xFFE8F5E9) to Color(0xFF43A047)
-        "กำลังดำเนินการ", "กำลังเตรียมอาหาร" -> Color(0xFFFFF3E0) to Color(0xFFFB8C00)
-        "ยกเลิก" -> Color(0xFFFFEBEE) to Color(0xFFE53935)
-        else -> Color(0xFFF5F5F5) to Color(0xFF757575)
+
+        "จัดส่งสำเร็จ", "สำเร็จ" ->
+            Color(0xFFC8E6C9) to Color(0xFF1B5E20)
+
+        "กำลังเตรียมอาหาร" ->
+            Color(0xFFFFE0B2) to Color(0xFFE65100)
+
+        "กำลังดำเนินการ" ->
+            Color(0xFFE1F5FE) to Color(0xFF01579B)
+
+        else ->
+            Color(0xFFEEEEEE) to Color(0xFF616161)
     }
 
     Surface(
         color = bgColor,
-        shape = RoundedCornerShape(8.dp)
+        shape = RoundedCornerShape(12.dp)
     ) {
         Text(
             text = status,
             color = textColor,
             fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+            fontWeight = FontWeight.Black,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
         )
     }
 }

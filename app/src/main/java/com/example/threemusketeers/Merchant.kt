@@ -317,12 +317,6 @@ fun MerchantHomeScreen(navController: NavHostController, merchantId: Int) {
             Spacer(modifier = Modifier.height(20.dp))
 
             Text(
-                text = "ยินดีต้อนรับกลับมา",
-                fontSize = 14.sp,
-                color = Color.Gray,
-                fontWeight = FontWeight.Medium
-            )
-            Text(
                 text = merchantData?.storeName ?: "กำลังโหลด...",
                 fontSize = 26.sp,
                 fontWeight = FontWeight.Black,
@@ -1167,7 +1161,6 @@ fun MerchantBottomNavigation(navController: NavHostController, currentRoute: Str
 @Composable
 fun MerchantOrderScreen(navController: NavHostController, merchantId: Int, database: AppDatabase) {
     val scope = rememberCoroutineScope()
-    // ดึงออเดอร์ของร้านนี้จาก DB
     val orders by database.orderDao().getOrdersByMerchant(merchantId).collectAsState(initial = emptyList())
     val backgroundColor = Color(0xFFFBFBFB)
 
@@ -1242,7 +1235,6 @@ fun MerchantOrderCardMinimal(order: OrderEntity, onStatusChange: (String) -> Uni
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            // ส่วนหัว: เลขที่ออเดอร์ และ สถานะ
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1254,16 +1246,12 @@ fun MerchantOrderCardMinimal(order: OrderEntity, onStatusChange: (String) -> Uni
                     fontSize = 18.sp,
                     color = Color(0xFF2D2D2D)
                 )
-                // เรียกใช้ Badge ที่เราเคยทำไว้เพื่อให้สีตรงกันทั้งแอป
                 StatusBadgeMinimal(order.status)
             }
-
             HorizontalDivider(
                 modifier = Modifier.padding(vertical = 12.dp),
                 color = Color(0xFFF5F5F5)
             )
-
-            // รายละเอียดสินค้า
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
                     modifier = Modifier.size(44.dp),
@@ -1295,7 +1283,6 @@ fun MerchantOrderCardMinimal(order: OrderEntity, onStatusChange: (String) -> Uni
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // ยอดรวม และ ปุ่มจัดการ
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1311,7 +1298,6 @@ fun MerchantOrderCardMinimal(order: OrderEntity, onStatusChange: (String) -> Uni
                     )
                 }
 
-                // ปุ่ม Action: แสดงเฉพาะออเดอร์ที่ยังไม่เสร็จ
                 if (order.status != "สำเร็จ" && order.status != "ยกเลิก") {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (order.status != "กำลังเตรียมอาหาร") {

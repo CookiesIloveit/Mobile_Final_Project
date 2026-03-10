@@ -38,7 +38,6 @@ fun HomeScreen(navController: NavHostController, database: AppDatabase) {
             .fillMaxSize()
             .background(Color(0xFFFBFBFB)) // พื้นหลังขาวนวล
     ) {
-        // --- ส่วนหัวและแถบ Filter ---
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = Color.White,
@@ -95,7 +94,6 @@ fun RestaurantCardMinimal(merchant: MerchantEntity, onClick: () -> Unit) {
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // โลโก้ร้านค้าแบบมุมโค้งมนนุ่มนวล
             AsyncImage(
                 model = merchant.logoPath,
                 contentDescription = null,
@@ -153,7 +151,6 @@ fun RestaurantCardMinimal(merchant: MerchantEntity, onClick: () -> Unit) {
                 }
             }
 
-            // ลูกศรบอกใบ้ว่ากดได้
             Icon(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = null,

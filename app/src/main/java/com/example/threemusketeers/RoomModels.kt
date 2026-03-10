@@ -142,7 +142,6 @@ interface OrderDao {
 
 @Dao
 interface CartDao {
-    // ... ฟังก์ชันอื่นๆ ที่มีอยู่แล้ว ...
 
     @Query("SELECT * FROM cart WHERE userId = :uId")
     suspend fun getCartByUserId(uId: Int): List<CartEntity>
@@ -171,7 +170,7 @@ interface CartDao {
         OrderEntity::class,
         CartEntity::class
     ],
-    version = 4, // เพิ่มเป็น 4 เพราะมีการเปลี่ยนโครงสร้างตาราง
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

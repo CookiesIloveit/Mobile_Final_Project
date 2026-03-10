@@ -41,7 +41,6 @@ fun AccountScreen(navController: NavHostController) {
             .fillMaxSize()
             .background(backgroundColor)
     ) {
-        // --- 1. Header ดีไซน์ใหม่ ---
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -78,9 +77,6 @@ fun AccountScreen(navController: NavHostController) {
                 )
             }
         }
-
-        // --- 2. ข้อมูลผู้ใช้ใน Card แบบลอย (Floating Card) ---
-        // ใช้ Offset เพื่อให้ Card ทับส่วน Header เล็กน้อย เพิ่มมิติ
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -114,8 +110,6 @@ fun AccountScreen(navController: NavHostController) {
         }
 
         Spacer(modifier = Modifier.weight(1f))
-
-        // --- 3. ปุ่มออกจากระบบสไตล์มินิมัล ---
         TextButton(
             onClick = {
                 SessionManager.currentUser = null

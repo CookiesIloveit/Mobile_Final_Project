@@ -1,6 +1,7 @@
 package com.example.threemusketeers
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,7 +32,6 @@ class CartViewModel(
     fun clearCartByMerchant(userId: Int, merchantId: Int) {
         viewModelScope.launch {
             repository.clearCartByMerchant(userId, merchantId)
-            // หลังจากลบใน DB แล้ว ต้องโหลดข้อมูลใหม่เพื่อให้ UI อัปเดตทันที
             loadCartFromDatabase(userId)
         }
     }
@@ -99,59 +99,6 @@ class CartViewModel(
         }
     }
 
-    fun clearUndoHistory(productId: Int) {
-        recentlyDeletedItems.remove(productId)
-    }
-
-    fun undoRemove(productId: Int) {
-        recentlyDeletedItems[productId]?.let { item ->
-            val currentCart = _cartItems.value.toMutableList()
-            currentCart.add(item)
-            _cartItems.value = currentCart
-
-            viewModelScope.launch(Dispatchers.IO) {
-                repository.saveCartItem(item)
-            }
-            recentlyDeletedItems.remove(productId)
-        }
-    }
-
-    fun syncCartToDatabase() {
-        val currentCart = _cartItems.value
-        if (currentCart.isEmpty()) {
-            recentlyDeletedItems.clear()
-            return
-        }
-        viewModelScope.launch(Dispatchers.IO) {
-            currentCart.forEach { item ->
-                repository.saveCartItem(item)
-            }
-            recentlyDeletedItems.clear()
-        }
-    }
-
-    fun checkoutByMerchant(userId: Int, merchantId: Int) {
-        val currentCart = _cartItems.value
-        val itemsToKeep = currentCart.filter { it.merchantId != merchantId }
-
-        viewModelScope.launch(Dispatchers.IO) {
-            _cartItems.value = itemsToKeep
-            repository.clearCartByMerchant(userId, merchantId)
-
-            currentCart.filter { it.merchantId == merchantId }.forEach { item ->
-                debounceJobs[item.productId]?.cancel()
-                debounceJobs.remove(item.productId)
-            }
-            recentlyDeletedItems.clear()
-        }
-    }
-
-    fun getTotalAmountByMerchant(merchantId: Int): Double {
-        return _cartItems.value
-            .filter { it.merchantId == merchantId }
-            .sumOf { it.price * it.qty }
-    }
-
     fun loadOrders(userId: Int) {
         viewModelScope.launch {
             repository.getOrdersByUser(userId).collect { orders ->
@@ -162,41 +109,58 @@ class CartViewModel(
 
     fun createOrderAndCheckout(userId: Int, merchantId: Int) {
         val currentCart = _cartItems.value
+        // กรองสินค้าเฉพาะของร้านที่กำลังจะชำระเงิน
         val storeCartItems = currentCart.filter { it.merchantId == merchantId }
 
         if (storeCartItems.isEmpty()) return
 
         val currentTimestamp = System.currentTimeMillis()
 
-        val newOrders = storeCartItems.map { item ->
-            OrderEntity(
-                userId = userId,
-                merchantId = merchantId,
-                productId = item.productId,
-                productName = item.productName,
-                price = item.price,
-                qty = item.qty,
-                totalAmount = item.price * item.qty,
-                status = "กำลังดำเนินการ",
-                imagePath = item.imagePath,
-                timestamp = currentTimestamp
-            )
-        }
+        val summaryProductName = storeCartItems.joinToString(", ") { it.productName }
+
+        val totalAmount = storeCartItems.sumOf { it.price * it.qty }
+
+        val totalQty = storeCartItems.sumOf { it.qty }
+
+        val summaryOrder = OrderEntity(
+            userId = userId,
+            merchantId = merchantId,
+            productId = 0,
+            productName = summaryProductName,
+            price = totalAmount / totalQty,
+            qty = totalQty,
+            totalAmount = totalAmount,
+            status = "กำลังเตรียมอาหาร", // เปลี่ยนสถานะเริ่มต้นให้ดูเป็นมิตรขึ้น
+            imagePath = storeCartItems.firstOrNull()?.imagePath,
+            timestamp = currentTimestamp
+        )
 
         viewModelScope.launch(Dispatchers.IO) {
-            // บันทึกลงประวัติการสั่งซื้อ
-            repository.saveOrders(newOrders)
+            // บันทึกออเดอร์เดียวเข้า Database
+            repository.saveOrders(listOf(summaryOrder))
 
-            // เคลียร์ตะกร้าของร้านนี้ออกจาก RAM และ Database
+            // ล้างตะกร้าเฉพาะของร้านนี้ออกจาก RAM และ Database
             val itemsToKeep = currentCart.filter { it.merchantId != merchantId }
             _cartItems.value = itemsToKeep
             repository.clearCartByMerchant(userId, merchantId)
 
-            // ล้าง Job ค้างเซฟทั้งหมดของร้านนี้
+            // ยกเลิก Job การบันทึกที่ค้างอยู่
             storeCartItems.forEach { item ->
                 debounceJobs[item.productId]?.cancel()
                 debounceJobs.remove(item.productId)
             }
         }
+    }
+}
+
+class CartViewModelFactory(
+    private val repository: CartRepository
+) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(CartViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return CartViewModel(repository) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
     }
 }

@@ -29,22 +29,10 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.room.Room
 
-// --- 1. Factory สำหรับสร้าง ViewModel ---
-class CartViewModelFactory(
-    private val repository: CartRepository
-) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(CartViewModel::class.java)) {
-            @Suppress("UNCHECKED_CAST")
-            return CartViewModel(repository) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class")
-    }
-}
 
 @Composable
 fun AppNavHost(navController: NavHostController,
-               database: AppDatabase,        // รับแค่ database ตัวเดียวพอ
+               database: AppDatabase,
                cartViewModel: CartViewModel,
                modifier: Modifier = Modifier) {
     NavHost(
@@ -195,8 +183,6 @@ fun MainApp() {
     val repository = remember { CartRepository(database.cartDao(), database.orderDao()) }
     val cartViewModel: CartViewModel = viewModel(factory = CartViewModelFactory(repository))
 
-    // ดึง DAO มาเตรียมไว้ส่งให้ AppNavHost
-    val userDao = database.userDao()
 
     // ตรวจสอบว่าเป็นหน้าของ Merchant หรือไม่
     val isMerchantRoute = currentRoute?.startsWith("merchant_home") == true ||
@@ -205,9 +191,6 @@ fun MainApp() {
             currentRoute?.startsWith("edit_product") == true ||
             currentRoute?.startsWith("edit_merchant_profile") == true ||
             currentRoute?.startsWith("merchant_orders") == true // เพิ่มบรรทัดนี้ครับ
-
-    // ตรวจสอบว่าเป็นหน้าหลักของลูกค้าหรือไม่
-    val showCustomerBottomBar = currentRoute in listOf(Screen.Home.route, Screen.History.route, Screen.Account.route)
 
     // จัดการเรื่องการโหลดข้อมูลตะกร้าเมื่อมีการเปลี่ยนหน้า
     LaunchedEffect(currentRoute) {
@@ -221,17 +204,15 @@ fun MainApp() {
     Scaffold(
         bottomBar = {
             if (isMerchantRoute) {
-                // 🌟 ดึง ID จาก Navigation BackStack แทน Session
                 val merchantIdFromRoute = navBackStackEntry?.arguments?.getString("merchantId")?.toIntOrNull()
-                    ?: SessionManager.currentMerchant?.merchantId // สำรองถ้าดึงจาก route ไม่ได้
+                    ?: SessionManager.currentMerchant?.merchantId
                     ?: 0
-
                 MerchantBottomNavigation(navController, currentRoute, merchantIdFromRoute)
             } else if (currentRoute in listOf(Screen.Home.route, Screen.History.route, Screen.Account.route)) {
                 AppBottomNavigation(navController, currentRoute)
             }
         },
-        containerColor = Color.White // เปลี่ยนจาก Transparent เป็น White เพื่อความชัดเจน
+        containerColor = Color.White
     ) { innerPadding ->
         AppNavHost(
             navController = navController,

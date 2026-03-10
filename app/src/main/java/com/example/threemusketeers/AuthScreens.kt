@@ -31,8 +31,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 object SessionManager {
-    var currentUser: UserEntity? = null      // สำหรับลูกค้า
-    var currentMerchant: MerchantEntity? = null // สำหรับร้านค้า (เพิ่มตัวนี้)
+    var currentUser: UserEntity? = null
+    var currentMerchant: MerchantEntity? = null
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -56,7 +56,6 @@ fun CustomerRegisterScreen(navController: NavHostController, userDao: UserDao) {
             .background(backgroundColor)
             .padding(horizontal = 24.dp)
     ) {
-        // --- ส่วนหัว (Top Bar แบบ Minimal) ---
         Spacer(modifier = Modifier.height(40.dp))
         IconButton(onClick = { navController.popBackStack() }) {
             Icon(Icons.Default.ArrowBackIosNew, contentDescription = "Back", tint = Color.Black)
@@ -78,7 +77,6 @@ fun CustomerRegisterScreen(navController: NavHostController, userDao: UserDao) {
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // --- ส่วนกรอกข้อมูล (Information Card) ---
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(24.dp),
@@ -89,7 +87,6 @@ fun CustomerRegisterScreen(navController: NavHostController, userDao: UserDao) {
                 modifier = Modifier.padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Username
                 MinimalTextField(
                     value = username,
                     onValueChange = { username = it },
@@ -99,7 +96,6 @@ fun CustomerRegisterScreen(navController: NavHostController, userDao: UserDao) {
                     isError = showError && username.isEmpty()
                 )
 
-                // Password
                 MinimalTextField(
                     value = password,
                     onValueChange = { password = it },
@@ -112,7 +108,6 @@ fun CustomerRegisterScreen(navController: NavHostController, userDao: UserDao) {
                     isError = showError && password.isEmpty()
                 )
 
-                // Phone
                 MinimalTextField(
                     value = phone,
                     onValueChange = { phone = it },
@@ -121,7 +116,6 @@ fun CustomerRegisterScreen(navController: NavHostController, userDao: UserDao) {
                     primaryColor = primaryColor
                 )
 
-                // Address
                 MinimalTextField(
                     value = address,
                     onValueChange = { address = it },
@@ -180,7 +174,6 @@ fun CustomerRegisterScreen(navController: NavHostController, userDao: UserDao) {
     }
 }
 
-// --- Helper Composable เพื่อให้โค้ดสะอาดตา ---
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MinimalTextField(
@@ -232,13 +225,11 @@ fun LoginScreen(navController: NavHostController, userDao: UserDao, merchantDao:
     var passwordVisible by remember { mutableStateOf(false) }
     var showAuthError by remember { mutableStateOf(false) }
 
-    // 0 = ลูกค้า, 1 = ร้านค้า
     var selectedTab by remember { mutableStateOf(0) }
     val coroutineScope = rememberCoroutineScope()
 
-    // สีสไตล์ Minimal
-    val primaryColor = Color(0xFFE53935) // แดงที่ดูทันสมัยขึ้น
-    val backgroundColor = Color(0xFFFBFBFB) // พื้นหลังขาวนวล
+    val primaryColor = Color(0xFFE53935)
+    val backgroundColor = Color(0xFFFBFBFB)
 
     Column(
         modifier = Modifier
@@ -248,7 +239,6 @@ fun LoginScreen(navController: NavHostController, userDao: UserDao, merchantDao:
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // --- ส่วนหัว (Logo/Brand) ---
         Icon(
             imageVector = Icons.Default.RestaurantMenu,
             contentDescription = null,
@@ -264,14 +254,13 @@ fun LoginScreen(navController: NavHostController, userDao: UserDao, merchantDao:
             letterSpacing = (-1).sp
         )
         Text(
-            "Delivery app for everyone",
+            "Be Best Friend When You Hungry",
             fontSize = 14.sp,
             color = Color.Gray
         )
 
         Spacer(modifier = Modifier.height(40.dp))
 
-        // --- Custom Toggle Switcher (Minimal Style) ---
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
@@ -310,7 +299,6 @@ fun LoginScreen(navController: NavHostController, userDao: UserDao, merchantDao:
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // --- Input Fields Section ---
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
@@ -377,7 +365,6 @@ fun LoginScreen(navController: NavHostController, userDao: UserDao, merchantDao:
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // --- Action Buttons ---
         Button(
             onClick = {
                 if (username.isNotBlank() && password.isNotBlank()) {
